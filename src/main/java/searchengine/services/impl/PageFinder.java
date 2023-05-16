@@ -10,7 +10,7 @@ import searchengine.model.Page;
 import searchengine.model.SitePage;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
-import searchengine.services.LemmaService;
+import searchengine.services.LemmaHandler;
 import searchengine.services.PageIndexer;
 
 import java.sql.Timestamp;
@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @AllArgsConstructor
 public class PageFinder extends RecursiveAction {
     private final PageIndexer pageIndexer;
-    private final LemmaService lemmaService;
+    private final LemmaHandler lemmaHandler;
     private final SiteRepository siteRepository;
     private final PageRepository pageRepository;
     private final AtomicBoolean indexingProcessing;
@@ -37,7 +37,7 @@ public class PageFinder extends RecursiveAction {
     private final SitePage siteDomain;
     private final ConcurrentHashMap<String, Page> resultForkJoinPoolIndexedPages;
 
-    public PageFinder(SiteRepository siteRepository, PageRepository pageRepository, SitePage siteDomain, String page, ConcurrentHashMap<String, Page> resultForkJoinPoolIndexedPages, Connection connection, LemmaService lemmaService,PageIndexer pageIndexer, AtomicBoolean indexingProcessing) {
+    public PageFinder(SiteRepository siteRepository, PageRepository pageRepository, SitePage siteDomain, String page, ConcurrentHashMap<String, Page> resultForkJoinPoolIndexedPages, Connection connection, LemmaHandler lemmaHandler, PageIndexer pageIndexer, AtomicBoolean indexingProcessing) {
         this.siteRepository = siteRepository;
         this.pageRepository = pageRepository;
         this.page = page;
@@ -45,7 +45,7 @@ public class PageFinder extends RecursiveAction {
         this.connection = connection;
         this.indexingProcessing = indexingProcessing;
         this.siteDomain = siteDomain;
-        this.lemmaService = lemmaService;
+        this.lemmaHandler = lemmaHandler;
         this.pageIndexer = pageIndexer;
     }
 
@@ -113,7 +113,7 @@ public class PageFinder extends RecursiveAction {
         List<PageFinder> indexingPagesTasks = new ArrayList<>();
         for (String url : urlSet) {
             if (resultForkJoinPoolIndexedPages.get(url) == null && indexingProcessing.get()) {
-                PageFinder task = new PageFinder(siteRepository,pageRepository,sitePage,url,resultForkJoinPoolIndexedPages,connection,lemmaService,pageIndexer, indexingProcessing);
+                PageFinder task = new PageFinder(siteRepository,pageRepository,sitePage,url,resultForkJoinPoolIndexedPages,connection, lemmaHandler,pageIndexer, indexingProcessing);
                 task.fork();
                 indexingPagesTasks.add(task);
             }

@@ -2,9 +2,6 @@ package searchengine.services.impl;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,7 +10,7 @@ import searchengine.model.Lemma;
 import searchengine.model.Page;
 import searchengine.repository.IndexSearchRepository;
 import searchengine.repository.LemmaRepository;
-import searchengine.services.LemmaService;
+import searchengine.services.LemmaHandler;
 import searchengine.services.PageIndexer;
 
 import java.io.IOException;
@@ -23,7 +20,7 @@ import java.util.Map;
 @Service
 @AllArgsConstructor
 public class PageIndexerImpl implements PageIndexer {
-    private LemmaService lemmaService;
+    private LemmaHandler lemmaHandler;
     private LemmaRepository lemmaRepository;
     private IndexSearchRepository indexSearchRepository;
 
@@ -31,7 +28,7 @@ public class PageIndexerImpl implements PageIndexer {
     public void indexHtml(String html, Page indexingPage) {
         long start = System.currentTimeMillis();
         try {
-            Map<String, Integer> lemmas = lemmaService.getLemmasFromText(html);
+            Map<String, Integer> lemmas = lemmaHandler.getLemmasFromText(html);
             lemmas.entrySet().parallelStream().forEach(entry -> {
                 saveLemma(entry.getKey(),entry.getValue(),indexingPage);
             });

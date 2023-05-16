@@ -1,106 +1,35 @@
 package searchengine.services.impl;
 
-import lombok.extern.slf4j.Slf4j;
-import org.apache.lucene.morphology.LuceneMorphology;
-import org.apache.lucene.morphology.russian.RussianLuceneMorphology;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import searchengine.config.SitesList;
+import searchengine.services.LemmaHandler;
 import searchengine.services.LemmaService;
 
 import java.io.IOException;
 import java.net.URL;
-import java.util.*;
 
 @Service
-@Slf4j
+@RequiredArgsConstructor
 public class LemmaServiceImpl implements LemmaService {
 
-    @Override
-    public Map<String, Integer> getLemmasFromText(String html) throws IOException {
-        Map<String, Integer> lemmasInText = new HashMap<>();
-        LuceneMorphology luceneMorph = new RussianLuceneMorphology();
-        String text = Jsoup.parse(html).text();
-        List<String> words = new ArrayList<>(List.of(text.replaceAll("(?U)\\pP","").toLowerCase().split(" ")));
-        words.forEach(w -> determineLemma(w, luceneMorph,lemmasInText));
-        return lemmasInText;
-    }
-    @Override
-    public List<String> getLemma(String word) throws IOException {
+    @Autowired
+    private final LemmaHandler lemmaHandler;
 
-        LuceneMorphology russianLuceneMorphology = new RussianLuceneMorphology();
-        List<String> lemmaList = new ArrayList<>();
+    @Override
+    public ResponseEntity<String> findLemmas(SitesList sitesList, URL url) throws IOException {
+
         try {
-            List<String> baseRusForm = russianLuceneMorphology.getNormalForms(word);
-            if (!isServiceWord(word)) {
-                lemmaList.addAll(baseRusForm);
-            }
-        } catch (Exception e) {
-        }
-        return lemmaList;
-    }
-    private boolean isServiceWord(String word) throws IOException {
-
-        LuceneMorphology russianLuceneMorphology = new RussianLuceneMorphology();
-        List<String> morphForm = russianLuceneMorphology.getMorphInfo(word);
-        for (String l : morphForm) {
-            if (l.contains("ПРЕДЛ")
-                    || l.contains("СОЮЗ")
-                    || l.contains("МЕЖД")
-                    || l.contains("МС")
-                    || l.contains("ЧАСТ")
-                    || l.length() <= 3) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    @Override
-    public List<Integer> findLemmaIndexInText(String content, String lemma) throws IOException {
-        List<Integer> lemmaIndexList = new ArrayList<>();
-        String[] elements = content.toLowerCase(Locale.ROOT).split("\\p{Punct}|\\s");
-        int index = 0;
-        for (String el : elements) {
-            List<String> lemmas = getLemma(el);
-            for (String lem : lemmas) {
-                if (lem.equals(lemma)) {
-                    lemmaIndexList.add(index);
-                }
-            }
-            index += el.length() + 1;
-        }
-        return lemmaIndexList;
-    }
-
-
-    private void determineLemma(String word, LuceneMorphology luceneMorphology,Map<String,Integer> lemmasInText) {
-        try{
-            if (word.isEmpty() || String.valueOf(word.charAt(0)).matches("[a-z]") || String.valueOf(word.charAt(0)).matches("[0-9]")) {
-                return;
-            }
-            List<String> normalWordForms = luceneMorphology.getNormalForms(word);
-            String wordInfo = luceneMorphology.getMorphInfo(word).toString();
-            if (wordInfo.contains("ПРЕДЛ") || wordInfo.contains("СОЮЗ") || wordInfo.contains("МЕЖД")) {
-                return;
-            }
-            normalWordForms.forEach(w -> {
-                if (!lemmasInText.containsKey(w)) {
-                    lemmasInText.put(w,1);
-                } else {
-                    lemmasInText.replace(w,lemmasInText.get(w) + 1);
-                }
-            });
+            sitesList.getSites().stream().filter(site -> url.getHost().equals(site.getUrl().getHost())).findFirst().orElseThrow();
         } catch (RuntimeException ex) {
-            log.debug(ex.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("result: false " +
+                    "error: Данная страница находится за пределами сайтов " +
+                    "указанных в конфигурационном файле");
         }
-
-    }
-
-    @Override
-    public void getLemmasFromUrl(URL url) throws IOException {
-        org.jsoup.Connection connect = Jsoup.connect(String.valueOf(url));
-        Document doc = connect.timeout(60000).get();
-        Map<String,Integer> res = getLemmasFromText(doc.body().html());
+        lemmaHandler.getLemmasFromUrl(url);
+        return ResponseEntity.status(HttpStatus.OK).body("result: true");
     }
 }

@@ -2,8 +2,8 @@ package searchengine.services.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.lucene.morphology.Morphology;
 import org.springframework.stereotype.Service;
+import searchengine.dto.SearchResults;
 import searchengine.dto.search.StatisticsSearch;
 import searchengine.model.IndexSearch;
 import searchengine.model.Lemma;
@@ -13,7 +13,7 @@ import searchengine.repository.IndexSearchRepository;
 import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
-import searchengine.services.LemmaService;
+import searchengine.services.LemmaHandler;
 import searchengine.services.SearchService;
 import searchengine.util.CleanHtmlCode;
 
@@ -25,14 +25,35 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class SearchServiceServiceImpl implements SearchService {
-    private final LemmaService morphology;
+    private final LemmaHandler morphology;
     private final LemmaRepository lemmaRepository;
     private final PageRepository pageRepository;
     private final IndexSearchRepository indexSearchRepository;
     private final SiteRepository siteRepository;
 
+
     @Override
-    public List<StatisticsSearch> allSiteSearch(String searchText, int offset, int limit) throws IOException {
+    public SearchResults search(String request, String site,
+                                int offset,
+                                int limit) throws IOException {
+        if (request.isEmpty()) {
+            return null;
+        } else {
+            List<StatisticsSearch> searchData;
+            if (!site.isEmpty()) {
+                if (siteRepository.findByUrl(site) == null) {
+                    return null;
+                } else {
+                    searchData = siteSearch(request, site, offset, limit);
+                }
+            } else {
+                searchData = allSiteSearch(request, offset, limit);
+            }
+            return (new SearchResults(true, searchData.size(), searchData));
+        }
+    }
+
+    private List<StatisticsSearch> allSiteSearch(String searchText, int offset, int limit) throws IOException {
         log.info("Getting results of the search \"" + searchText + "\"");
         List<SitePage> siteList = siteRepository.findAll();
         List<StatisticsSearch> result = new ArrayList<>();
@@ -65,13 +86,12 @@ public class SearchServiceServiceImpl implements SearchService {
         return searchData;
     }
 
-    @Override
-    public List<StatisticsSearch> siteSearch(String searchText, String url, int offset, int limit) throws IOException {
+    private List<StatisticsSearch> siteSearch(String searchText, String url, int offset, int limit) throws IOException {
         log.info("Searching for \"" + searchText + "\" in - " + url);
         SitePage site = siteRepository.findByUrl(url);
         List<String> textLemmaList = getLemmaFromSearchText(searchText);
         List<Lemma> foundLemmaList = getLemmaListFromSite(textLemmaList, site);
-        foundLemmaList.forEach(x->System.out.println(x.getLemma()));
+        foundLemmaList.forEach(x -> System.out.println(x.getLemma()));
         return getSearchDtoList(foundLemmaList, textLemmaList, offset, limit);
     }
 
@@ -212,7 +232,7 @@ public class SearchServiceServiceImpl implements SearchService {
         return pageWithAbsRelevance.entrySet().stream()
                 .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
                 .collect(Collectors.toMap(Map.Entry::getKey,
-                Map.Entry::getValue, (e1, e2) -> e1, Hashtable::new));
+                        Map.Entry::getValue, (e1, e2) -> e1, Hashtable::new));
     }
 
 }
